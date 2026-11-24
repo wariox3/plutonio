@@ -13,13 +13,17 @@ npm run build:aab   # AAB de release con .env.prod
 ## Reglas que no se negocian
 
 - No cambiar `applicationId` (`com.semantica.cilog2`) una vez publicado, ni la clave de subida. `versionCode` siempre mayor que el último subido a Play. No tocar la app anterior (`com.plutonio`). Ver `docs/release-play.md`.
-- Secretos fuera del repo: `.env*`, `google-services.json`, las `MYAPP_UPLOAD_*` y `TRANSISTORSOFT_LICENSE` de `~/.gradle/gradle.properties`, e `ios/Secretos.xcconfig`. Nunca agregarlos a `android/gradle.properties`. iOS: ver `docs/release-appstore.md`.
+- Secretos fuera del repo: `.env*` (incluido `.env.sentry-build-plugin`, el token de Sentry), `google-services.json`, las `MYAPP_UPLOAD_*` y `TRANSISTORSOFT_LICENSE` de `~/.gradle/gradle.properties`, e `ios/Secretos.xcconfig`. Nunca agregarlos a `android/gradle.properties`. iOS: ver `docs/release-appstore.md`.
 - Capas: `ui` no importa `core`/`features`; `core` no importa `features`/`app`; `features` no importan `app` ni otras features. Módulos de `core` y `ui` se importan por su `index.ts` (`@/core/api`), y los relativos no suben más de un nivel. ESLint lo hace cumplir. Detalle en `docs/arquitectura.md`.
 - Las pantallas no llaman a axios ni SQLite; usan hooks de su feature. Toda escritura offline pasa por la cola de operaciones pendientes con `id_operacion` UUID.
 - Respuestas de Fluor siempre validadas con zod. Errores con `mensajeUsuario(error)` de `@/core/api`.
 - Estilos solo con `StyleSheet` de unistyles y el tema de `ui/tema`. Sin colores literales ni estilos inline (ESLint lo bloquea). Los colores viven solo en `ui/tema/paletas/` y se usan por rol (`tema.colores.accion`); la paleta activa se cambia en `paletas/index.ts`. Ver *Paletas* en `docs/arquitectura.md`. Importar primitivas e íconos desde `@/ui`; un ícono nuevo se agrega en `ui/iconos.ts` (nunca `lucide-react-native` directo).
 - `edgeToEdgeEnabled=true`: toda pantalla usa `Pantalla` (respeta safe areas y teclado).
 - Alias `@/` apunta a `src/`. No hay archivos `.js` en `src/`.
+
+## Observabilidad
+
+Sentry solo se toca desde `@/core/observabilidad` (`reportarError`, `dejarRastro`); ESLint bloquea `@sentry/react-native` en el resto. Se reporta lo inesperado, no lo normal: los fallos de red y los errores de negocio (clave incorrecta, 409 de la cola) no son eventos. Nunca van claves, tokens, cuerpos de peticiones ni el correo completo. Qué se reporta y cómo se configura: `docs/observabilidad.md`.
 
 ## Sesión
 

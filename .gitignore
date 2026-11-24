@@ -80,6 +80,7 @@ ios/GoogleService-Info.plist
 .env
 .env.*
 !.env.example
+!.env.sentry-build-plugin.example
 
 # Certificado público de la clave de subida (no versionar)
 *.pem

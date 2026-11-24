@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, {type AxiosError} from 'axios';
 import {z} from 'zod';
 
 export type CodigoError =
@@ -48,6 +48,13 @@ export class ErrorApi extends Error {
   readonly reintentarEn: number | null;
   /** Campos extra del error (p. ej. `is_verified` en "Cuenta no verificada"). */
   readonly extras: Record<string, unknown>;
+  /**
+   * Motivo técnico cuando no hubo respuesta (p. ej. `SSLHandshakeException`,
+   * `UnknownHostException`). Solo para diagnóstico: nunca se muestra al usuario.
+   */
+  readonly causa: string | null;
+  /** Método y ruta de la petición (sin dominio ni parámetros), para los reportes. */
+  readonly peticion: string | null;
 
   constructor(datos: {
     codigo: CodigoError;
@@ -57,6 +64,8 @@ export class ErrorApi extends Error {
     detalles?: DetalleValidacion[];
     reintentarEn?: number | null;
     extras?: Record<string, unknown>;
+    causa?: string | null;
+    peticion?: string | null;
   }) {
     super(datos.mensaje);
     this.name = 'ErrorApi';
@@ -66,6 +75,8 @@ export class ErrorApi extends Error {
     this.detalles = datos.detalles ?? [];
     this.reintentarEn = datos.reintentarEn ?? null;
     this.extras = datos.extras ?? {};
+    this.causa = datos.causa ?? null;
+    this.peticion = datos.peticion ?? null;
   }
 }
 
@@ -80,16 +91,58 @@ const codigoPorEstado = (estado: number): CodigoError => {
   return 'PETICION_INVALIDA';
 };
 
+const MAXIMO_CAUSA = 300;
+
+/**
+ * Axios reduce cualquier fallo sin respuesta a "Network Error". En React
+ * Native el motivo real (DNS, certificado, conexión rechazada) queda en
+ * `_response` de la petición nativa.
+ */
+const causaDe = (error: AxiosError): string | null => {
+  const nativa = (error.request as {_response?: unknown} | undefined)
+    ?._response;
+  const texto =
+    typeof nativa === 'string' && nativa.trim() ? nativa : error.message;
+  return texto ? texto.slice(0, MAXIMO_CAUSA) : null;
+};
+
+/** `POST /auth/seguridad/login`: sin dominio ni parámetros (pueden traer datos del usuario). */
+const peticionDe = (error: AxiosError): string | null => {
+  const ruta = error.config?.url?.split('?')[0];
+  if (!ruta) return null;
+  return `${(error.config?.method ?? 'get').toUpperCase()} ${ruta}`;
+};
+
+/** El id que la app mandó en `X-Request-ID`: sirve aunque no haya respuesta. */
+const idEnviado = (error: AxiosError): string | null => {
+  const valor: unknown = error.config?.headers?.['X-Request-ID'];
+  return typeof valor === 'string' ? valor : null;
+};
+
 /** Convierte cualquier cosa lanzada por axios o por código propio en un `ErrorApi`. */
 export const traducirError = (error: unknown): ErrorApi => {
   if (error instanceof ErrorApi) return error;
 
   if (axios.isAxiosError(error)) {
+    const peticion = peticionDe(error);
+    const requestId = idEnviado(error);
     if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-      return new ErrorApi({codigo: 'TIEMPO_AGOTADO', mensaje: error.message});
+      return new ErrorApi({
+        codigo: 'TIEMPO_AGOTADO',
+        mensaje: error.message,
+        causa: causaDe(error),
+        peticion,
+        requestId,
+      });
     }
     if (!error.response) {
-      return new ErrorApi({codigo: 'SIN_CONEXION', mensaje: error.message});
+      return new ErrorApi({
+        codigo: 'SIN_CONEXION',
+        mensaje: error.message,
+        causa: causaDe(error),
+        peticion,
+        requestId,
+      });
     }
 
     const {status, data, headers} = error.response;
@@ -97,6 +150,7 @@ export const traducirError = (error: unknown): ErrorApi => {
     const base = {
       estado: status,
       reintentarEn: Number.isFinite(reintento) ? reintento : null,
+      peticion,
     };
 
     const cuerpo = esquemaErrorFluor.safeParse(data);
@@ -106,7 +160,7 @@ export const traducirError = (error: unknown): ErrorApi => {
         ...base,
         codigo: CODIGOS_FLUOR[code] ?? codigoPorEstado(status),
         mensaje: message,
-        requestId: cuerpo.data.request_id ?? null,
+        requestId: cuerpo.data.request_id ?? requestId,
         detalles: (errores ?? []).map(e => ({
           campo: e.campo ?? '',
           mensaje: e.mensaje,
@@ -119,6 +173,7 @@ export const traducirError = (error: unknown): ErrorApi => {
       ...base,
       codigo: codigoPorEstado(status),
       mensaje: error.message,
+      requestId,
     });
   }
 

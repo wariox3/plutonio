@@ -4,6 +4,11 @@ import {z} from 'zod';
 const esquemaEnv = z.object({
   API_URL: z.url(),
   ENTORNO: z.enum(['dev', 'prod']).default('dev'),
+  /** Sin DSN, Sentry queda apagado (desarrollo y pruebas). Un valor vacío cuenta como ausente. */
+  SENTRY_DSN: z.preprocess(
+    valor => (valor === '' ? undefined : valor),
+    z.url().optional(),
+  ),
 });
 
 /**

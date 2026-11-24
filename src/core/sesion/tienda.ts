@@ -2,6 +2,11 @@ import {create} from 'zustand';
 
 import {clienteConsultas, configurarSesionApi} from '@/core/api';
 import {
+  dejarRastro,
+  identificarUsuario,
+  reportarError,
+} from '@/core/observabilidad';
+import {
   actualizarCredencialesRastreo,
   detenerRastreo,
   olvidarRechazadas,
@@ -85,7 +90,14 @@ export const useSesion = create<Tienda>((set, get) => ({
   avisoSesion: null,
 
   restaurar: async () => {
-    const credenciales = await leerCredenciales().catch(() => null);
+    const credenciales = await leerCredenciales().catch(error => {
+      // Sin llavero no hay sesión: el conductor tendría que entrar cada vez.
+      reportarError(error, {
+        etiquetas: {origen: 'llavero', accion: 'leer'},
+        huella: ['llavero', 'leer'],
+      });
+      return null;
+    });
     const perfil = leerPerfil();
     // Un token de acceso vencido no cierra la sesión: la primera petición lo renueva.
     if (!credenciales || !perfil || !sesionVigente(credenciales)) {
@@ -130,7 +142,13 @@ export const useSesion = create<Tienda>((set, get) => ({
     const {tokenRenovacion} = get();
     // Primero en memoria: el cliente HTTP reintenta con este token de inmediato.
     set({token});
-    await guardarCredenciales({token, tokenRenovacion}).catch(() => undefined);
+    // En memoria ya sirve; si el llavero falla, al reabrir la app pedirá login.
+    await guardarCredenciales({token, tokenRenovacion}).catch(error =>
+      reportarError(error, {
+        etiquetas: {origen: 'llavero', accion: 'guardar'},
+        huella: ['llavero', 'guardar'],
+      }),
+    );
   },
 
   elegirEmpresa: (empresa, tieneVariasEmpresas) => {
@@ -163,9 +181,34 @@ export const useSesion = create<Tienda>((set, get) => ({
 
 const sesionInvalida = () => {
   if (useSesion.getState().estado === 'sinSesion') return;
+  dejarRastro({
+    categoria: 'sesion',
+    mensaje: 'Sesión invalidada por el servidor',
+    nivel: 'warning',
+  });
   useSesion
     .getState()
     .cerrarSesion('Tu sesión expiró. Inicia sesión de nuevo.');
+};
+
+/**
+ * Los reportes llevan el id del usuario y su empresa (nada más). Se llama una
+ * sola vez al arrancar.
+ */
+export const conectarSesionConObservabilidad = () => {
+  const identificar = ({usuario, empresa}: Tienda) =>
+    identificarUsuario(
+      usuario ? {id: usuario.id, tenantId: empresa?.tenant_id ?? null} : null,
+    );
+  identificar(useSesion.getState());
+  return useSesion.subscribe((actual, anterior) => {
+    if (
+      actual.usuario?.id !== anterior.usuario?.id ||
+      actual.empresa?.tenant_id !== anterior.empresa?.tenant_id
+    ) {
+      identificar(actual);
+    }
+  });
 };
 
 /** Conecta el cliente HTTP con la sesión. Se llama una sola vez al arrancar. */

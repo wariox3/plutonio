@@ -1,15 +1,17 @@
 import {
   DefaultTheme,
   NavigationContainer,
+  useNavigationContainerRef,
   type Theme,
 } from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {type ComponentProps, useEffect, useMemo} from 'react';
+import {type ComponentProps, useCallback, useEffect, useMemo} from 'react';
 import {Platform} from 'react-native';
 import BootSplash from 'react-native-bootsplash';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {useUnistyles} from 'react-native-unistyles';
 
+import {dejarRastro} from '@/core/observabilidad';
 import {useSesion} from '@/core/sesion';
 import {
   EmpresaPantalla,
@@ -60,6 +62,13 @@ export function Navegador() {
   const estado = useSesion(s => s.estado);
   const restaurar = useSesion(s => s.restaurar);
   const datos = useDatosLocales();
+  const navegacion = useNavigationContainerRef<ParametrosRutas>();
+
+  // Solo el nombre de la pantalla (sin parámetros): qué hacía el conductor antes de un error.
+  const registrarPantalla = useCallback(() => {
+    const pantalla = navegacion.getCurrentRoute()?.name;
+    if (pantalla) dejarRastro({categoria: 'navegacion', mensaje: pantalla});
+  }, [navegacion]);
 
   useEffect(() => {
     restaurar();
@@ -105,7 +114,11 @@ export function Navegador() {
   }
 
   return (
-    <NavigationContainer theme={temaNavegacion}>
+    <NavigationContainer
+      onReady={registrarPantalla}
+      onStateChange={registrarPantalla}
+      ref={navegacion}
+      theme={temaNavegacion}>
       <Stack.Navigator screenOptions={{headerShown: false}}>
         {estado === 'sinSesion' ? (
           <>

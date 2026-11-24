@@ -1,4 +1,5 @@
 import {ErrorApi, traducirError} from '@/core/api';
+import {reportarError} from '@/core/observabilidad';
 import type {ArchivoOperacion, Enviador} from '@/core/sync';
 
 import {entregarGuiaApi} from '../api/entrega';
@@ -20,7 +21,7 @@ type Peticion = (datos: {
  */
 const enviadorMultipart =
   (nombre: string, marca: string, peticion: Peticion): Enviador =>
-  async ({tenantDespachoId, cuerpo, archivos}) => {
+  async ({idOperacion, tenantDespachoId, cuerpo, archivos}) => {
     if (tenantDespachoId === null) {
       throw new ErrorApi({
         codigo: 'NO_ENCONTRADO',
@@ -34,10 +35,37 @@ const enviadorMultipart =
         datos: cuerpo,
         archivos,
       });
-      return {conservarArchivos: respuesta.ficheros_con_error > 0};
+      const sinSubir = respuesta.ficheros_con_error;
+      if (sinSubir > 0) {
+        // Fluor guardó la operación pero no todos los archivos, y la app no
+        // puede reenviarlos: lo resuelve backend (docs/offline.md §8).
+        reportarError(new Error(`Fluor no guardó archivos de una ${nombre}`), {
+          nivel: 'warning',
+          etiquetas: {origen: 'cola', tipo: nombre, caso: 'ficheros_con_error'},
+          extras: {
+            id_operacion: idOperacion,
+            ficheros_con_error: sinSubir,
+            archivos: archivos.length,
+          },
+          huella: ['cola', 'ficheros_con_error', idOperacion],
+        });
+      }
+      return {conservarArchivos: sinSubir > 0};
     } catch (error) {
       const errorApi = traducirError(error);
       if (errorApi.estado === 409 && errorApi.extras[marca] === true) {
+        // Si la gestionó otra persona, la evidencia de este conductor no llegó
+        // a Fluor: queda en el teléfono y la oficina debe saberlo (§7.3).
+        reportarError(new Error(`${nombre} ya aplicada en Fluor (409)`), {
+          nivel: 'warning',
+          etiquetas: {origen: 'cola', tipo: nombre, caso: 'ya_aplicada'},
+          extras: {
+            id_operacion: idOperacion,
+            request_id: errorApi.requestId,
+            archivos: archivos.length,
+          },
+          huella: ['cola', 'ya_aplicada', idOperacion],
+        });
         return {conservarArchivos: true};
       }
       // Otro 409 ("La guía no está despachada", "El despacho está cerrado") no

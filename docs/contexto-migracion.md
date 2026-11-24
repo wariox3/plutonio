@@ -54,7 +54,7 @@ Hecho (Fase 0 y gran parte de la Fase 1): config, cliente API, sesión segura, l
 1. **Probar login y registro en el emulador**: `npm run android` (reinstalar; se quitó el WebView). `.env` apunta a producción. Si el registro responde "Token de verificación requerido", producción aún no tiene el commit `329211e` de Fluor. Entonces usar Fluor local (`API_URL=http://10.0.2.2:8000`) o crear la cuenta desde la web.
 2. **Refresh token** (propuesto, sin confirmar): Fluor (`1f80800`) ya devuelve `refresh_token` de 30 días en el login con `mobile` o `api`, y `POST /auth/seguridad/refresh` con `{refresh_token}` devuelve `{access_token, token_type}` (10/min). Plan: guardarlo en el llavero, renovar solo ante un 401 con una única petición de refresh en curso, y cerrar sesión si falla. Considerar pasar el login a `client_type: "mobile"` (puede fallar en un prod no actualizado). Actualizar `docs/contratos-fluor.md` (sección 16) y `docs/arquitectura.md` (~línea 54), que aún dicen que no hay refresh.
 3. **Firebase 27** (push y sesión única). `google-services.json` ya está copiado (ignorado por git).
-4. **Sentry** (falta el DSN).
+4. **Sentry**: integrado y probado en el emulador (`docs/observabilidad.md`). En una máquina nueva hay que poner `SENTRY_DSN` en `.env.prod` y el token en `.env.sentry-build-plugin`.
 5. **Fase 2**: compatibilidad de `@react-native-community/geolocation` con Nueva Arquitectura, librería de compresión de imágenes, op-sqlite + drizzle, cola `operaciones_pendientes` con motor de sincronización (un solo flujo de despacho, sin duplicar online/offline), pantallas de despacho, guías y novedades.
 6. Compilar iOS en Xcode y probar en dispositivo físico.
 

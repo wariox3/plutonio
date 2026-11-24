@@ -2,8 +2,9 @@ import axios, {type InternalAxiosRequestConfig} from 'axios';
 import {z} from 'zod';
 
 import {env} from '@/core/config';
+import {dejarRastro, reportarError} from '@/core/observabilidad';
 
-import {traducirError} from './errores';
+import {traducirError, type ErrorApi} from './errores';
 import {generarIdPeticion} from './idPeticion';
 
 /**
@@ -113,10 +114,42 @@ cliente.interceptors.request.use(config => {
   return config;
 });
 
+/**
+ * Todo fallo deja rastro con el `request_id` (backend lo busca en sus logs).
+ * Solo un 5xx es evento: es un fallo de Fluor, no del conductor ni de su
+ * señal. Los de red son normales en ruta; quien sabe que no lo son (el
+ * acceso, con el teléfono conectado) los reporta por su cuenta.
+ */
+const registrarFallo = (errorApi: ErrorApi) => {
+  dejarRastro({
+    categoria: 'api',
+    mensaje: `${errorApi.peticion ?? 'petición'} → ${errorApi.estado ?? errorApi.codigo}`,
+    nivel: errorApi.codigo === 'SERVIDOR' ? 'error' : 'warning',
+    datos: {
+      codigo: errorApi.codigo,
+      estado: errorApi.estado,
+      request_id: errorApi.requestId,
+      causa: errorApi.causa,
+    },
+  });
+  if (errorApi.codigo !== 'SERVIDOR') return;
+  reportarError(errorApi, {
+    etiquetas: {origen: 'api', estado: errorApi.estado},
+    extras: {peticion: errorApi.peticion, request_id: errorApi.requestId},
+    huella: [
+      'api',
+      'servidor',
+      errorApi.peticion ?? '',
+      String(errorApi.estado),
+    ],
+  });
+};
+
 cliente.interceptors.response.use(
   respuesta => respuesta,
   async error => {
     const errorApi = traducirError(error);
+    registrarFallo(errorApi);
     const config: ConfigConRenovacion | undefined = axios.isAxiosError(error)
       ? error.config
       : undefined;

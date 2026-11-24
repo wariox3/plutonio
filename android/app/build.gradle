@@ -5,6 +5,18 @@ apply plugin: "com.facebook.react"
 // Variables de entorno (.env / ENVFILE) para react-native-config.
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
+// Sentry: en release sube los source maps para que los errores lleguen legibles
+// (docs/observabilidad.md). El token vive fuera del repo, en
+// .env.sentry-build-plugin o en SENTRY_AUTH_TOKEN; sin él se compila igual, sin subir.
+apply from: new File(["node", "--print", "require.resolve('@sentry/react-native/package.json')"].execute(null, rootDir).text.trim(), "../sentry.gradle")
+def tieneTokenSentry = System.getenv("SENTRY_AUTH_TOKEN") || rootProject.file("../.env.sentry-build-plugin").exists()
+project.ext.shouldSentryAutoUploadGeneral = { ->
+    tieneTokenSentry && System.getenv("SENTRY_DISABLE_AUTO_UPLOAD") != "true"
+}
+if (!tieneTokenSentry) {
+    logger.warn("[sentry] Sin token (.env.sentry-build-plugin): no se suben source maps.")
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -85,8 +97,8 @@ android {
         applicationId "com.semantica.cilog2"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.2.0"
+        versionCode 7
+        versionName "1.2.1"
         // Licencia del rastreo: fuera del repo, como la firma (docs/release-play.md).
         manifestPlaceholders["transistorsoftLicense"] =
             project.findProperty("TRANSISTORSOFT_LICENSE") ?: ""

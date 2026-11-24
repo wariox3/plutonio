@@ -1,4 +1,8 @@
-import {AxiosError, type AxiosResponse} from 'axios';
+import {
+  AxiosError,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios';
 
 import {ErrorApi, mensajeUsuario, traducirError} from '@/core/api/errores';
 
@@ -14,6 +18,31 @@ const respuesta = (
   } as unknown as AxiosResponse);
 
 describe('traducirError', () => {
+  it('sin respuesta conserva el motivo nativo, la ruta y el id enviado', () => {
+    const error = traducirError(
+      new AxiosError(
+        'Network Error',
+        'ERR_NETWORK',
+        {
+          method: 'post',
+          url: '/auth/seguridad/login?x=1',
+          headers: {'X-Request-ID': 'req-7'},
+        } as unknown as InternalAxiosRequestConfig,
+        {_response: 'java.net.UnknownHostException: api.semanticaerp.com'},
+      ),
+    );
+    expect(error.codigo).toBe('SIN_CONEXION');
+    expect(error.causa).toBe(
+      'java.net.UnknownHostException: api.semanticaerp.com',
+    );
+    expect(error.peticion).toBe('POST /auth/seguridad/login');
+    expect(error.requestId).toBe('req-7');
+    // El motivo técnico nunca llega al usuario.
+    expect(mensajeUsuario(error)).toBe(
+      'Sin conexión. Revisa tu internet e inténtalo de nuevo.',
+    );
+  });
+
   it('lee el formato de error de Fluor', () => {
     const error = traducirError(
       respuesta(401, {

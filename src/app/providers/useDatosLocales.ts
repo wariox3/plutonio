@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useState} from 'react';
 
 import {abrirBase} from '@/core/db';
+import {reportarError} from '@/core/observabilidad';
 import {iniciarSincronizacion, type Enviador} from '@/core/sync';
 import {enviadoresDespachos} from '@/features/despachos';
 
@@ -27,7 +28,12 @@ export const useDatosLocales = () => {
         if (vigente) setEstado('listos');
         else detenerSincronizacion();
       })
-      .catch(() => {
+      .catch(error => {
+        // Sin base no hay despachos ni cola: es lo más grave que puede fallar.
+        reportarError(error, {
+          etiquetas: {origen: 'base-local', intento},
+          huella: ['base-local', 'abrir'],
+        });
         if (vigente) setEstado('error');
       });
     return () => {
