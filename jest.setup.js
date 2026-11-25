@@ -212,3 +212,24 @@ jest.mock('react-native-background-geolocation', () => {
     LogLevel: {Warning: 2, Verbose: 5},
   };
 });
+
+// Sentry es nativo: en Jest solo se observa qué se reporta.
+jest.mock('@sentry/react-native', () => {
+  const alcance = {
+    setLevel: jest.fn(),
+    setTags: jest.fn(),
+    setExtras: jest.fn(),
+    setFingerprint: jest.fn(),
+  };
+  return {
+    __alcance: alcance,
+    init: jest.fn(),
+    wrap: componente => componente,
+    withScope: jest.fn(accion => accion(alcance)),
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+    setUser: jest.fn(),
+    setTag: jest.fn(),
+    ErrorBoundary: ({children}) => children,
+  };
+});

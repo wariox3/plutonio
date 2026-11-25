@@ -6,6 +6,7 @@ export {
 } from './esquemas';
 export {
   conectarSesionConApi,
+  conectarSesionConObservabilidad,
   conectarSesionConRastreo,
   useSesion,
   type EstadoSesion,

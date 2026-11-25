@@ -260,6 +260,25 @@ describe('cola de operaciones y motor de sincronización', () => {
     expect(await leerOperacion(otra)).toMatchObject({estado: 'confirmada'});
   });
 
+  it('reporta la rechazada a Sentry con su id_operacion; un fallo de red no', async () => {
+    const captura = jest.requireMock('@sentry/react-native');
+    captura.captureException.mockClear();
+    const id = await encolarEn(entrega(1));
+    await encolarEn(entrega(2));
+    const enviar: Enviador = async ({cuerpo}) => {
+      throw (cuerpo as {codigo_guia: number}).codigo_guia === 1
+        ? error('VALIDACION', 422)
+        : error('SIN_CONEXION');
+    };
+
+    await motorCon({entrega: enviar}).ejecutar();
+
+    expect(captura.captureException).toHaveBeenCalledTimes(1);
+    expect(captura.__alcance.setExtras).toHaveBeenLastCalledWith(
+      expect.objectContaining({id_operacion: id, request_id: 'req-1'}),
+    );
+  });
+
   it('un 409 queda en conflicto para que decida el conductor', async () => {
     const id = await encolarEn(entrega(1));
 

@@ -7,6 +7,8 @@ import {mostrarError} from '@/ui';
 import {iniciarSesionApi} from '../api/auth';
 import type {FormularioLogin} from '../domain/formularios';
 
+import {reportarFalloAcceso} from './reporteAcceso';
+
 /** Fluor responde 403 con `is_verified: false` cuando falta confirmar el correo. */
 export const esCuentaNoVerificada = (error: unknown) =>
   traducirError(error).extras.is_verified === false;
@@ -26,8 +28,9 @@ export const useIniciarSesion = () => {
       );
     },
     // La cuenta sin verificar tiene su propio aviso en la pantalla, con la acción para resolverlo.
-    onError: error => {
+    onError: (error, {email}) => {
       if (!esCuentaNoVerificada(error)) mostrarError(mensajeUsuario(error));
+      reportarFalloAcceso(error, 'login', email).catch(() => undefined);
     },
   });
 };

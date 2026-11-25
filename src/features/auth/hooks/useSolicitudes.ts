@@ -10,13 +10,18 @@ import {
   type DatosRegistro,
 } from '../api/auth';
 
+import {reportarFalloAcceso, type FlujoAcceso} from './reporteAcceso';
+
 /** Registro, recuperación y reenvío son públicos: muestran el error del servidor tal cual. */
-const alFallar = (error: unknown) => mostrarError(mensajeUsuario(error));
+const alFallar = (error: unknown, flujo: FlujoAcceso, correo: string) => {
+  mostrarError(mensajeUsuario(error));
+  reportarFalloAcceso(error, flujo, correo).catch(() => undefined);
+};
 
 export const useRegistrar = () =>
   useMutation({
     mutationFn: (datos: DatosRegistro) => registrarApi(datos),
-    onError: alFallar,
+    onError: (error, {email}) => alFallar(error, 'registro', email),
   });
 
 export type TipoSolicitudCorreo = 'recuperarClave' | 'reenviarVerificacion';
@@ -27,5 +32,5 @@ export const useSolicitarCorreo = (tipo: TipoSolicitudCorreo) =>
       tipo === 'recuperarClave'
         ? recuperarClaveApi(email)
         : reenviarVerificacionApi(email),
-    onError: alFallar,
+    onError: (error, email) => alFallar(error, tipo, email),
   });

@@ -94,7 +94,8 @@ Inter (lectura: 400, 500, 600), Space Grotesk 700 (títulos: variantes `marca`, 
 | Navegación por estado de sesión (`app/navegacion`) | 1 | Hecho, con pruebas |
 | Sesión: token en llavero, perfil y empresa en MMKV (`core/sesion`) | 1 | Hecho, con pruebas |
 | Login y selección de empresa (`features/auth`) | 1 | Hecho, con pruebas. La empresa es opcional (solo ingreso y envíos). Diseño *Banda navy*: el login lleva una portada navy en la escena de marca (`PortadaLogin`) y el formulario en una hoja blanca; el resto del acceso va sobre blanco (`PantallaAcceso`). Probado en el emulador |
-| Firebase (push y sesión única), Sentry | 1 | Pendiente |
+| Firebase (push y sesión única) | 1 | Pendiente |
+| Sentry (`core/observabilidad`): caídas, acceso, API, cola, base local, llavero y rastreo | 1 | Hecho, con pruebas. Probado en el emulador de Android (el evento llega con su source map); falta un teléfono real e iOS (ver `docs/observabilidad.md`) |
 | Registro, recuperación de clave y reenvío de verificación | 1 | Hecho, con pruebas. Falta probar contra el Fluor desplegado |
 | SQLite, cola y motor de sincronización (`core/db`, `core/sync`) | 2 | Hecho, con pruebas. Enviadores de entrega y novedad; terminar espera su endpoint |
 | Despachos: API, repositorio y casos de uso (vincular, actualizar, descargar, desvincular) | 2 | Hecho, con pruebas. Falta probar contra Fluor |

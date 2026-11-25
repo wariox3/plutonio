@@ -4,7 +4,7 @@ import {StyleSheet} from 'react-native-unistyles';
 import {Check, Icono, Insignia, Texto} from '@/ui';
 
 import type {GuiaLocal} from '../db/repositorio';
-import {pesos} from '../domain/formato';
+import {numero, pesos} from '../domain/formato';
 import {aCobrar} from '../domain/gestion';
 import {situacionGuia} from '../domain/guias';
 import {EstadoGuia} from './EstadoGuia';
@@ -100,7 +100,7 @@ export function FilaGuia({guia, alPresionar, alMantener, seleccion}: Props) {
           </Texto>
         ) : null}
         <Texto mono tono="secundario" variante="pie">
-          {referenciaGuia(guia)}
+          {referenciaGuia(guia)} · {numero(guia.pesoReal)} kg
           {guia.documentoCliente ? ` · ${guia.documentoCliente}` : ''}
         </Texto>
         {!pendiente || guia.envio || guia.retirada || guia.requiereCita ? (

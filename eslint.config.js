@@ -39,6 +39,11 @@ const prohibir = (...grupos) => ({
           message:
             'Importa los íconos desde @/ui (ui/iconos.ts): el paquete completo suma ~2 MB al bundle.',
         },
+        {
+          name: '@sentry/react-native',
+          message:
+            'Reporta con @/core/observabilidad: es el único módulo que conoce Sentry.',
+        },
       ],
       patterns: [
         ...comunes,
@@ -115,6 +120,23 @@ module.exports = [
       ],
     ),
   })),
+  {
+    files: ['src/core/observabilidad/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            ...comunes,
+            {
+              group: ['@/features/*', '@/app/*'],
+              message: 'Import prohibido por la arquitectura de capas.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   {
     // Los colores viven solo en las paletas: cambiar de paleta es cambiar un archivo.
     files: ['src/ui/tema/paletas/**/*.ts'],

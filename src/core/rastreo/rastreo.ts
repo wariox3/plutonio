@@ -4,6 +4,7 @@ import BackgroundGeolocation, {
 } from 'react-native-background-geolocation';
 import {z} from 'zod';
 
+import {reportarError} from '@/core/observabilidad';
 import {almacen} from '@/core/storage';
 
 import {
@@ -168,6 +169,11 @@ export const prepararRastreo = (proveedor: ProveedorRastreo) => {
     );
   })().catch(error => {
     preparado = null;
+    // Licencia, configuración o el plugin: sin esto no hay rastreo y nadie se entera.
+    reportarError(error, {
+      etiquetas: {origen: 'rastreo', accion: 'preparar'},
+      huella: ['rastreo', 'preparar'],
+    });
     throw error;
   });
   return preparado;
@@ -201,11 +207,22 @@ export const iniciarRastreo = async (asignacion: number) => {
     await sinFallar(() => BackgroundGeolocation.destroyLocations());
   }
   guardarAsignacion(asignacion);
-  await BackgroundGeolocation.setConfig({http: configuracionHttp(asignacion)});
-  const {status} = await BackgroundGeolocation.getProviderState();
-  await ajustarSegunPermiso(status);
-  const {enabled} = await BackgroundGeolocation.getState();
-  if (!enabled) await BackgroundGeolocation.start();
+  try {
+    await BackgroundGeolocation.setConfig({
+      http: configuracionHttp(asignacion),
+    });
+    const {status} = await BackgroundGeolocation.getProviderState();
+    await ajustarSegunPermiso(status);
+    const {enabled} = await BackgroundGeolocation.getState();
+    if (!enabled) await BackgroundGeolocation.start();
+  } catch (error) {
+    // El permiso ya se revisó antes de llegar aquí: si no arranca, es un fallo del plugin.
+    reportarError(error, {
+      etiquetas: {origen: 'rastreo', accion: 'iniciar'},
+      huella: ['rastreo', 'iniciar'],
+    });
+    throw error;
+  }
   return true;
 };
 

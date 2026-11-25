@@ -1,6 +1,7 @@
 import {ErrorApi} from '@/core/api';
 import {borrarEvidencia, existeEvidencia} from '@/core/archivos';
 import {escribir, leer} from '@/core/db';
+import {dejarRastro, reportarError} from '@/core/observabilidad';
 
 import {clasificarFallo} from './clasificar';
 import {
@@ -90,6 +91,10 @@ export const crearMotor = ({
 
     await escribir(tx => marcarEnviando(tx, operacion.idOperacion));
     avisar();
+    const rastro = {
+      id_operacion: operacion.idOperacion,
+      intentos: operacion.intentos + 1,
+    };
     try {
       const archivos = await leer(db => archivosDe(db, operacion.idOperacion));
       await exigirArchivos(archivos);
@@ -106,9 +111,20 @@ export const crearMotor = ({
       });
       // Las fotos ya están en Fluor: libera espacio en el teléfono.
       await Promise.all(rutas.map(borrarEvidencia));
+      dejarRastro({
+        categoria: 'cola',
+        mensaje: `${operacion.tipo} enviada`,
+        datos: {...rastro, archivos_conservados: conservar},
+      });
       return true;
     } catch (error) {
       const fallo = clasificarFallo(error);
+      dejarRastro({
+        categoria: 'cola',
+        mensaje: `${operacion.tipo} falló: ${fallo.clase}`,
+        nivel: 'warning',
+        datos: {...rastro, codigo: fallo.codigo, request_id: fallo.requestId},
+      });
       // Si la sesión no sirve, el cliente la cierra. Un 401 con la sesión aún
       // abierta es de un token que ya se renovó: se reintenta, no se pausa.
       const sesionAbierta =
@@ -138,7 +154,19 @@ export const crearMotor = ({
         });
         return false;
       }
-      // Rechazada o en conflicto: solo frena lo que depende de ella.
+      // Rechazada o en conflicto: solo frena lo que depende de ella. Casi
+      // siempre es un error de la app o de datos, no del conductor: se reporta
+      // con lo que backend necesita para encontrarla (docs/offline.md §14).
+      reportarError(error, {
+        etiquetas: {
+          origen: 'cola',
+          tipo: operacion.tipo,
+          clase: fallo.clase,
+          codigo: fallo.codigo,
+        },
+        extras: {...rastro, request_id: fallo.requestId, motivo: fallo.mensaje},
+        huella: ['cola', operacion.idOperacion],
+      });
       await escribir(tx =>
         marcarFallida(
           tx,
