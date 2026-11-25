@@ -1,6 +1,6 @@
 # Contexto de la migración (Plutonio → plutonio-app)
 
-Resumen para retomar el trabajo desde este repo. El proyecto viejo (`/Users/sebastianhoyos/Desktop/semantica/cilog`, RN 0.81, native-base, Redux) queda **solo como referencia**. Este repo es la reescritura.
+Resumen para retomar el trabajo desde este repo. El proyecto viejo (`/Users/sebastianhoyos/Desktop/semantica/_archivo/cilog`, RN 0.81, native-base, Redux) queda **solo como referencia**. Este repo es la reescritura.
 
 ## Qué es
 
